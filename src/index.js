@@ -1,4 +1,6 @@
-import { GALLERY } from "./gallery.js";
+import { ARCHIVE_TAG, GALLERY } from "./gallery.js";
+
+const ARCHIVE_BASE = "https://github.com/InkeyP/bonjourr-lolicon-wallpaper/releases/download";
 
 export default {
   async fetch(request) {
@@ -18,7 +20,7 @@ export default {
     }
 
     try {
-      const { image, contentType, galleryIndex } = await fetchHourlyImage();
+      const { image, contentType, galleryIndex, source } = await fetchHourlyImage();
 
       return new Response(request.method === "HEAD" ? null : image.body, {
         status: image.status,
@@ -27,6 +29,7 @@ export default {
           "Content-Type": contentType,
           "Cache-Control": "no-store, max-age=0",
           "X-Gallery-Index": String(galleryIndex),
+          "X-Image-Source": source,
         },
       });
     } catch (error) {
@@ -43,34 +46,80 @@ async function fetchHourlyImage() {
 
   for (let offset = 0; offset < GALLERY.length; offset++) {
     const galleryIndex = (start + offset) % GALLERY.length;
-    const imageUrl = GALLERY[galleryIndex];
-    const image = await fetch(imageUrl, {
-      headers: imageRequestHeaders(),
-      cf: {
-        cacheTtl: 0,
-        cacheEverything: false,
-      },
-    });
-    const contentType = image.headers.get("Content-Type") || "image/jpeg";
 
-    if (image.ok && contentType.startsWith("image/")) {
-      return { image, contentType, galleryIndex };
+    const archived = await fetchImage(archiveUrl(galleryIndex));
+
+    if (archived) {
+      return {
+        image: archived,
+        contentType: contentTypeFor(GALLERY[galleryIndex]),
+        galleryIndex,
+        source: "archive",
+      };
+    }
+
+    const upstream = await fetchImage(GALLERY[galleryIndex]);
+
+    if (upstream) {
+      const contentType = upstream.headers.get("Content-Type") || "image/jpeg";
+
+      if (contentType.startsWith("image/")) {
+        return { image: upstream, contentType, galleryIndex, source: "upstream" };
+      }
     }
   }
 
-  throw new Error("No upstream image is currently available");
+  throw new Error("No archived or upstream image is currently available");
+}
+
+async function fetchImage(url) {
+  const response = await fetch(url, {
+    headers: imageRequestHeaders(),
+    cf: {
+      cacheTtl: 0,
+      cacheEverything: false,
+    },
+  });
+
+  return response.ok ? response : null;
+}
+
+function archiveUrl(galleryIndex) {
+  const fileName = new URL(GALLERY[galleryIndex]).pathname.split("/").pop();
+  return `${ARCHIVE_BASE}/${ARCHIVE_TAG}/${String(galleryIndex).padStart(2, "0")}-${fileName}`;
+}
+
+function contentTypeFor(url) {
+  const pathname = new URL(url).pathname.toLowerCase();
+
+  if (pathname.endsWith(".png")) {
+    return "image/png";
+  }
+
+  if (pathname.endsWith(".gif")) {
+    return "image/gif";
+  }
+
+  if (pathname.endsWith(".webp")) {
+    return "image/webp";
+  }
+
+  return "image/jpeg";
 }
 
 function metaResponse() {
   const hour = getBeijingHour();
+  const selectedIndex = hour % GALLERY.length;
 
   return Response.json(
     {
       timezone: "Asia/Shanghai",
       hour,
       gallerySize: GALLERY.length,
-      selectedIndex: hour % GALLERY.length,
-      selectedUrl: GALLERY[hour % GALLERY.length],
+      archiveTag: ARCHIVE_TAG,
+      selectedIndex,
+      selectedArchiveUrl: archiveUrl(selectedIndex),
+      selectedUpstreamUrl: GALLERY[selectedIndex],
     },
     {
       headers: {

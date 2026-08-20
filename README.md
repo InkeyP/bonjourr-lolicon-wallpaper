@@ -2,11 +2,13 @@
 
 Cloudflare Worker that proxies one hourly non-R18 image from a daily gallery generated from the lolicon `/setu/v2` API as an `image/*` response for Bonjourr's `URLs` background source.
 
-The live lolicon API currently returns 403 from Cloudflare Worker egress, so GitHub Actions updates `src/gallery.js` once per day. The Worker selects one of the 24 gallery entries by Asia/Shanghai hour.
+The live lolicon API currently returns 403 from Cloudflare Worker egress, so GitHub Actions updates `src/gallery.js` once per day. The Worker selects one of the 24 gallery entries by Asia/Shanghai hour, serves it from the day's GitHub release archive first, and falls back to proxying the upstream `i.pixiv.re` URL.
 
 ## GitHub Actions
 
 The workflow in `.github/workflows/update-gallery.yml` runs every day at 00:10 Asia/Shanghai and can also be triggered manually.
+
+Before deploying, the workflow downloads the day's 24 gallery images and uploads them to a GitHub release tagged with the `ARCHIVE_TAG` from `src/gallery.js` (`gallery-YYYY-MM-DD`, Asia/Shanghai date). The deployed Worker serves images from that release, so wallpapers keep working and stay archived after the upstream URLs rot.
 
 Required repository secret:
 

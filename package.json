@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "node --check src/index.js && node --check src/gallery.js && node --check scripts/update-gallery.mjs",
+    "archive-gallery": "node scripts/archive-gallery.mjs",
+    "check": "node --check src/index.js && node --check src/gallery.js && node --check scripts/update-gallery.mjs && node --check scripts/archive-gallery.mjs",
     "deploy": "wrangler deploy",
     "update-gallery": "node scripts/update-gallery.mjs"
   },
