@@ -8,7 +8,7 @@ The live lolicon API currently returns 403 from Cloudflare Worker egress, so Git
 
 The workflow in `.github/workflows/update-gallery.yml` runs every day at 00:10 Asia/Shanghai and can also be triggered manually.
 
-Before deploying, the workflow downloads the day's 24 gallery images and uploads them to a GitHub release tagged with the `ARCHIVE_TAG` from `src/gallery.js` (`gallery-YYYY-MM-DD`, Asia/Shanghai date). The deployed Worker serves images from that release, so wallpapers keep working and stay archived after the upstream URLs rot.
+Before deploying, the workflow downloads the day's 24 gallery images concurrently and uploads them plus a `manifest.json` to a GitHub release tagged with the `ARCHIVE_TAG` from `src/gallery.js` (`gallery-YYYY-MM-DD`, Asia/Shanghai date). The deployed Worker serves images from that release, so wallpapers keep working and stay archived after the upstream URLs rot. The repository must stay public so the Worker can read release assets anonymously.
 
 Required repository secret:
 
@@ -28,6 +28,12 @@ Bonjourr URL:
 
 ```text
 https://bonjourr-lolicon-wallpaper.<your-workers-subdomain>.workers.dev/
+```
+
+Browse any day's archived images:
+
+```text
+https://bonjourr-lolicon-wallpaper.<your-workers-subdomain>.workers.dev/gallery
 ```
 
 Debug metadata:

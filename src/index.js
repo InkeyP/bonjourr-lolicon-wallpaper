@@ -1,4 +1,5 @@
 import { ARCHIVE_TAG, GALLERY } from "./gallery.js";
+import { galleryPage } from "./page.js";
 
 const ARCHIVE_BASE = "https://github.com/InkeyP/bonjourr-lolicon-wallpaper/releases/download";
 
@@ -15,8 +16,20 @@ export default {
       });
     }
 
-    if (new URL(request.url).pathname === "/meta") {
+    const { pathname } = new URL(request.url);
+
+    if (pathname === "/meta") {
       return metaResponse();
+    }
+
+    if (pathname === "/gallery") {
+      return galleryResponse(request.method);
+    }
+
+    const archiveMatch = pathname.match(/^\/archive\/(gallery-\d{4}-\d{2}-\d{2})\/([\w.-]+)$/);
+
+    if (archiveMatch) {
+      return archiveResponse(archiveMatch[1], archiveMatch[2], request.method);
     }
 
     try {
@@ -84,23 +97,57 @@ async function fetchImage(url) {
   return response.ok ? response : null;
 }
 
+async function archiveResponse(tag, fileName, method) {
+  const upstream = await fetch(`${ARCHIVE_BASE}/${tag}/${fileName}`, {
+    headers: imageRequestHeaders(),
+    cf: {
+      cacheEverything: true,
+      cacheTtl: fileName === "manifest.json" ? 300 : 86_400,
+    },
+  });
+
+  if (!upstream.ok) {
+    return new Response("Not Found", { status: 404, headers: corsHeaders() });
+  }
+
+  const isManifest = fileName === "manifest.json";
+
+  return new Response(method === "HEAD" ? null : upstream.body, {
+    headers: {
+      ...corsHeaders(),
+      "Content-Type": isManifest ? "application/json; charset=utf-8" : contentTypeFor(fileName),
+      "Cache-Control": isManifest ? "no-store, max-age=0" : "public, max-age=86400, immutable",
+    },
+  });
+}
+
+function galleryResponse(method) {
+  return new Response(method === "HEAD" ? null : galleryPage(ARCHIVE_TAG.slice("gallery-".length)), {
+    headers: {
+      ...corsHeaders(),
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store, max-age=0",
+    },
+  });
+}
+
 function archiveUrl(galleryIndex) {
   const fileName = new URL(GALLERY[galleryIndex]).pathname.split("/").pop();
   return `${ARCHIVE_BASE}/${ARCHIVE_TAG}/${String(galleryIndex).padStart(2, "0")}-${fileName}`;
 }
 
-function contentTypeFor(url) {
-  const pathname = new URL(url).pathname.toLowerCase();
+function contentTypeFor(path) {
+  const lower = path.toLowerCase();
 
-  if (pathname.endsWith(".png")) {
+  if (lower.endsWith(".png")) {
     return "image/png";
   }
 
-  if (pathname.endsWith(".gif")) {
+  if (lower.endsWith(".gif")) {
     return "image/gif";
   }
 
-  if (pathname.endsWith(".webp")) {
+  if (lower.endsWith(".webp")) {
     return "image/webp";
   }
 

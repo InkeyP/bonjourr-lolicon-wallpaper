@@ -14,26 +14,33 @@ await rm(archiveDir, { recursive: true, force: true });
 await mkdir(archiveDir, { recursive: true });
 await writeFile(resolve(archiveDir, ".tag"), `${ARCHIVE_TAG}\n`);
 
-let saved = 0;
+const results = await Promise.all(GALLERY.map(archiveImage));
+const saved = results.filter(Boolean).sort();
 
-for (const [index, url] of GALLERY.entries()) {
+if (saved.length === 0) {
+  throw new Error("Failed to download every gallery image.");
+}
+
+await writeFile(
+  resolve(archiveDir, "manifest.json"),
+  `${JSON.stringify({ tag: ARCHIVE_TAG, files: saved }, null, 2)}\n`,
+);
+
+console.log(`Archived ${saved.length}/${GALLERY.length} images.`);
+
+async function archiveImage(url, index) {
   const fileName = `${String(index).padStart(2, "0")}-${basename(new URL(url).pathname)}`;
 
   try {
     const image = await download(url);
     await writeFile(resolve(archiveDir, fileName), image);
-    saved++;
     console.log(`Saved ${fileName}`);
+    return fileName;
   } catch (error) {
     console.error(`Failed ${url}: ${error instanceof Error ? error.message : error}`);
+    return null;
   }
 }
-
-if (saved === 0) {
-  throw new Error("Failed to download every gallery image.");
-}
-
-console.log(`Archived ${saved}/${GALLERY.length} images.`);
 
 async function download(url) {
   for (let attempt = 1; ; attempt++) {
