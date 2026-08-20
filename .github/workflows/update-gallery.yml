@@ -58,12 +58,6 @@ jobs:
             gh release create "$tag" --title "$tag" --notes "每日图库存档"
           fi
 
-          for name in $(gh release view "$tag" --json assets --jq '.assets[].name'); do
-            if [ ! -e "archive/$name" ]; then
-              gh release delete-asset "$tag" "$name" --yes
-            fi
-          done
-
           gh release upload "$tag" archive/* --clobber
 
       - name: Deploy Worker

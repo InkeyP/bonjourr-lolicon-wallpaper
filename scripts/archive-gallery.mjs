@@ -6,6 +6,7 @@ import { ARCHIVE_TAG, GALLERY } from "../src/gallery.js";
 
 const MAX_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 5_000;
+const ARCHIVE_BASE = "https://github.com/InkeyP/bonjourr-lolicon-wallpaper/releases/download";
 
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const archiveDir = resolve(rootDir, "archive");
@@ -15,18 +16,38 @@ await mkdir(archiveDir, { recursive: true });
 await writeFile(resolve(archiveDir, ".tag"), `${ARCHIVE_TAG}\n`);
 
 const results = await Promise.all(GALLERY.map(archiveImage));
-const saved = results.filter(Boolean).sort();
+const saved = results.filter(Boolean);
 
 if (saved.length === 0) {
   throw new Error("Failed to download every gallery image.");
 }
 
+const files = [...new Set([...(await fetchExistingManifest()), ...saved])].sort();
+
 await writeFile(
   resolve(archiveDir, "manifest.json"),
-  `${JSON.stringify({ tag: ARCHIVE_TAG, files: saved }, null, 2)}\n`,
+  `${JSON.stringify({ tag: ARCHIVE_TAG, files }, null, 2)}\n`,
 );
 
-console.log(`Archived ${saved.length}/${GALLERY.length} images.`);
+console.log(`Archived ${saved.length}/${GALLERY.length} images, manifest lists ${files.length}.`);
+
+async function fetchExistingManifest() {
+  try {
+    const response = await fetch(`${ARCHIVE_BASE}/${ARCHIVE_TAG}/manifest.json`, {
+      headers: { "User-Agent": browserUserAgent() },
+      signal: AbortSignal.timeout(30_000),
+    });
+
+    if (!response.ok) {
+      return [];
+    }
+
+    const manifest = await response.json();
+    return manifest.files;
+  } catch {
+    return [];
+  }
+}
 
 async function archiveImage(url, index) {
   const fileName = `${String(index).padStart(2, "0")}-${basename(new URL(url).pathname)}`;
